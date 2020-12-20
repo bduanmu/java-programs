@@ -1,0 +1,56 @@
+class Type {
+    static int FIRE = 0; 
+    static int WATER = 1; 
+    static int GRASS = 2; 
+    static double[][] effectiveness = {
+        {0.5, 0.5, 2.0}, 
+        {2.0, 0.5, 0.5}, 
+        {0.5, 2.0, 0.5} 
+    }; 
+}
+
+abstract class Move {
+    int maxPP; 
+    int remainingPP; 
+    int type; 
+    int priority; 
+}
+
+abstract class AttackingMove extends Move {
+    int power;
+}
+
+abstract class StatusMove extends Move {
+    
+}
+
+abstract class Pokemon {
+    int maxHealth; 
+    int remainingHealth;
+    int attack; 
+    int defense; 
+    int speed; 
+    String name;
+    Move[] moves; 
+    
+    Pokemon(String name, int maxHealth, int attack, int defense, int speed) {
+        this.maxHealth = maxHealth; 
+        this.remainingHealth = maxHealth; 
+        this.attack = attack;
+        this.defense = defense;
+        this.speed = speed;
+        this.name = name; 
+    }
+}
+
+class Charmander extends Pokemon {
+    Charmander(String name) {
+        super(name, 39, 52, 43, 65);
+    }
+}
+
+public class Pokemon {
+	public static void main(String[] args) {
+        
+	}
+}
