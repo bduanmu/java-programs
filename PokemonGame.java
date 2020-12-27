@@ -1,3 +1,5 @@
+import java.util.*;
+
 class Type {
     static int FIRE = 0; 
     static int WATER = 1; 
@@ -41,6 +43,12 @@ abstract class Move {
         remainingPP--; 
         return SUCCESS; 
     }
+    
+    /* NOT DONE ======================================================
+    String toString() {
+        return 
+    }
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 }
 
 abstract class TargetingMove extends Move {
@@ -66,7 +74,7 @@ abstract class TargetingMove extends Move {
     }
 }
 
-abstract class AttackingMove extends TargetingMove {
+class AttackingMove extends TargetingMove {
     int power;
     
     AttackingMove(String name, int type, int maxPP, int priority, int power) {
@@ -86,7 +94,7 @@ abstract class AttackingMove extends TargetingMove {
     }
 }
 
-abstract class StatusMove extends TargetingMove {
+class StatusMove extends TargetingMove {
     StatusMove(String name, int type, int maxPP, int priority) { 
         super(name, type, maxPP, priority);
     }
@@ -103,7 +111,9 @@ abstract class Pokemon {
     static int NO_STATUS = 0; 
     static int FAINTED = 1; 
     String name;
-    Move[] moves = new Move[4]; 
+    Move[] moves = new Move[5]; 
+    
+    private String[] statusString = {"", "Fainted"}; 
 
     Pokemon(String name, int maxHealth, int attack, int defense, int speed, int type) {
         this.maxHealth = maxHealth; 
@@ -113,6 +123,7 @@ abstract class Pokemon {
         this.speed = speed;
         this.name = name; 
         this.type = type; 
+        moves[0] = new Move("Switch", -1, -1, 6); 
     }
     
     void takeDamage(int amount) {
@@ -123,15 +134,19 @@ abstract class Pokemon {
         
         remainingHealth -= amount; 
     }
+    
+    public String toString() {
+        return name + " (" + statusString[status] + ") " + remainingHealth + "/" + maxHealth; 
+    }
 }
 
 class Charmander extends Pokemon {
     Charmander(String name) {
         super(name, 39, 52, 43, 65, Type.FIRE);
-        moves[0] = new AttackingMove("Ember1", Type.FIRE, 40, 0, 40); 
-        moves[1] = new AttackingMove("Ember2", Type.FIRE, 40, 0, 40); 
-        moves[2] = new AttackingMove("Ember3", Type.FIRE, 40, 0, 40); 
-        moves[3] = new AttackingMove("Ember4", Type.FIRE, 40, 0, 40); 
+        moves[1] = new AttackingMove("Ember1", Type.FIRE, 40, 0, 40); 
+        moves[2] = new AttackingMove("Ember2", Type.FIRE, 40, 0, 40); 
+        moves[3] = new AttackingMove("Ember3", Type.FIRE, 40, 0, 40); 
+        moves[4] = new AttackingMove("Ember4", Type.FIRE, 40, 0, 40); 
     }
 }
 
@@ -154,23 +169,61 @@ class Player {
 
 class Game {
     Player[] players = new Player[2]; 
+    Pokemon[] activePokemon = new Pokemon[2]; 
+    
+    private Scanner scanner = new Scanner(System.in);
     
     Game() {
+        players[0] = new Player(); 
+        players[1] = new Player(); 
         players[0].team[0] = new Charmander("Charmander1"); 
         players[1].team[0] = new Charmander("Charmander2"); 
     }
     
     void start() {
-        
+        choosePokemon(0); 
+        choosePokemon(1); 
     }
     
-    int choosePokemon(int index) {
-        for (int )
+    void choosePokemon(int index) {
+        while (true) {
+            System.out.println("Choose a Pokemon: ");
+            for (int i = 0; i < players[index].team.length; i++) {
+                if (players[index].team[i] == null) {
+                    break; 
+                }
+                System.out.println((i + 1) + ": " + players[index].team[i]); 
+            }
+            int pokemonIndex = Integer.parseInt(scanner.nextLine()) - 1; 
+            
+            if (players[index].team[pokemonIndex] == null) {
+                System.out.println("Invalid index. ");
+                continue; 
+            }
+            if (players[index].team[pokemonIndex].status == Pokemon.FAINTED) {
+                System.out.println("That Pokemon is fainted. "); 
+                continue; 
+            }
+            activePokemon[index] = players[index].team[pokemonIndex]; 
+            return; 
+        }
+    }
+    
+    void chooseMove() {
+        for (int i = 0; i < 2; i++) {
+            while (true) { 
+                System.out.println("Choose a move: "); 
+                for (int j = 0; j < 5; j++) {
+                    System.out.println(j + ": " + activePokemon[i].moves[j])
+                }
+            }
+        }
     }
 }
 
 public class Main {
 	public static void main(String[] args) {
-
+        Game game = new Game(); 
+        game.start(); 
 	}
 }
