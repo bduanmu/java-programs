@@ -1,17 +1,30 @@
 import java.util.*;
 
-class Type {
-    static int FIRE = 0; 
-    static int WATER = 1; 
-    static int GRASS = 2; 
-    static double[][] effectiveness = {
-        {0.5, 0.5, 2.0}, 
-        {2.0, 0.5, 0.5}, 
-        {0.5, 2.0, 0.5} 
-    }; 
+class Utility {
+    static boolean roll(int n) {
+        if (Math.random() * 100 < n) {
+            return true; 
+        }
+        return false; 
+    }
 }
 
-abstract class Move {
+class Type {
+    static int NO_TYPE = 0; 
+    static int FIRE = 1; 
+    static int WATER = 2; 
+    static int GRASS = 3; 
+    static double[][] effectiveness = {
+        {1.0, 1.0, 1.0, 1.0}, 
+        {1.0, 0.5, 0.5, 2.0}, 
+        {1.0, 2.0, 0.5, 0.5}, 
+        {1.0, 0.5, 2.0, 0.5} 
+    }; 
+    
+    static String[] typeString = {"NO TYPE", "FIRE", "WATER", "GRASS"}; 
+}
+
+class Move {
     String name;
     int maxPP; 
     int remainingPP; 
@@ -32,7 +45,7 @@ abstract class Move {
         this.priority = priority; 
     }
     
-    int use(Pokemon user) {
+    int use(Pokemon user, Pokemon target) {
         if (user.status == Pokemon.FAINTED) {
             return IM_FAINTED; 
         }
@@ -44,11 +57,9 @@ abstract class Move {
         return SUCCESS; 
     }
     
-    /* NOT DONE ======================================================
-    String toString() {
-        return 
+    public String toString() {
+        return name + " (" + Type.typeString[type] + ") (" + priority + ") " + "PP: " + remainingPP + "/" + maxPP;
     }
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 }
 
 abstract class TargetingMove extends Move {
@@ -57,7 +68,7 @@ abstract class TargetingMove extends Move {
     }
     
     int use(Pokemon user, Pokemon target) {
-        int moveStatus = super.use(user); 
+        int moveStatus = super.use(user, target); 
         if (moveStatus != SUCCESS) {
             return moveStatus; 
         }
@@ -83,12 +94,13 @@ class AttackingMove extends TargetingMove {
     }
     
     int use(Pokemon user, Pokemon target) {
-        int moveStatus = super.use(target); 
+        int moveStatus = super.use(user, target); 
         if (moveStatus != SUCCESS) {
             return moveStatus; 
         }
         
         int movePower = (int) (power * user.attack * Type.effectiveness[type][target.type])/target.defense; 
+        target.takeDamage(movePower); 
         
         return SUCCESS; 
     }
@@ -97,6 +109,17 @@ class AttackingMove extends TargetingMove {
 class StatusMove extends TargetingMove {
     StatusMove(String name, int type, int maxPP, int priority) { 
         super(name, type, maxPP, priority);
+    }
+}
+
+class SwitchMove extends Move {
+    SwitchMove() {
+        super("Switch", Type.NO_TYPE, -1, 6);
+    }
+    
+    int use(Pokemon user, Pokemon target, int player) {
+        Game.choosePokemon(player); 
+        return SUCCESS; 
     }
 }
 
@@ -123,13 +146,14 @@ abstract class Pokemon {
         this.speed = speed;
         this.name = name; 
         this.type = type; 
-        moves[0] = new Move("Switch", -1, -1, 6); 
+        moves[0] = new SwitchMove();
     }
     
     void takeDamage(int amount) {
         if (remainingHealth <= amount) {
             status = FAINTED; 
             remainingHealth = 0; 
+            return; 
         }
         
         remainingHealth -= amount; 
@@ -168,24 +192,63 @@ class Player {
 }
 
 class Game {
-    Player[] players = new Player[2]; 
-    Pokemon[] activePokemon = new Pokemon[2]; 
+    static Player[] players = new Player[2]; 
+    static Pokemon[] activePokemon = new Pokemon[2]; 
+    static Move[] queuedMove = new Move[2];
+    static int[] numAlivePokemon = new int[2];
     
-    private Scanner scanner = new Scanner(System.in);
+    static private Scanner scanner = new Scanner(System.in);
     
     Game() {
         players[0] = new Player(); 
         players[1] = new Player(); 
-        players[0].team[0] = new Charmander("Charmander1"); 
-        players[1].team[0] = new Charmander("Charmander2"); 
+        players[0].team[0] = new Charmander("Charmander1.0"); 
+        players[0].team[1] = new Charmander("Charmander1.1"); 
+        players[0].team[2] = new Charmander("Charmander1.2"); 
+        players[0].team[3] = new Charmander("Charmander1.3"); 
+        players[1].team[0] = new Charmander("Charmander2.0"); 
+        players[1].team[1] = new Charmander("Charmander2.1"); 
+        players[1].team[2] = new Charmander("Charmander2.2"); 
+        players[1].team[3] = new Charmander("Charmander2.3");
+        numAlivePokemon[0] = 4; 
+        numAlivePokemon[1] = 4;
     }
     
     void start() {
         choosePokemon(0); 
         choosePokemon(1); 
+        while (true) {
+            System.out.println(activePokemon[0]);
+            System.out.println(activePokemon[1]);
+            displayActivePokemon(0); 
+            chooseMove(0);
+            displayActivePokemon(1); 
+            chooseMove(1); 
+            resolveMoves();
+            for (int i = 0; i < 2; i++) {
+                if (activePokemon[i].status == Pokemon.FAINTED) {
+                    numAlivePokemon[i]--; 
+                }
+            }
+            if (numAlivePokemon[0] == 0 && numAlivePokemon[1] == 0) {
+                System.out.println("Its a draw. "); 
+                return; 
+            } else if (numAlivePokemon[0] == 0) {
+                System.out.println("Player 2 wins! "); 
+                return; 
+            } else if (numAlivePokemon[1] == 0) {
+                System.out.println("Player 1 wins! ");
+                return; 
+            } 
+            for (int i = 0; i < 2; i++) {
+                if (activePokemon[i].status == Pokemon.FAINTED) {
+                    choosePokemon(i); 
+                }
+            }
+        }
     }
     
-    void choosePokemon(int index) {
+    static void choosePokemon(int index) {
         while (true) {
             System.out.println("Choose a Pokemon: ");
             for (int i = 0; i < players[index].team.length; i++) {
@@ -209,14 +272,65 @@ class Game {
         }
     }
     
-    void chooseMove() {
-        for (int i = 0; i < 2; i++) {
-            while (true) { 
-                System.out.println("Choose a move: "); 
-                for (int j = 0; j < 5; j++) {
-                    System.out.println(j + ": " + activePokemon[i].moves[j])
-                }
+    void displayActivePokemon(int index) {
+        System.out.println(activePokemon[index]);
+        for (int i = 0; i < 5; i++) {
+            System.out.println(i + ": " + activePokemon[index].moves[i]);
+        }
+    }
+    
+    void chooseMove(int index) {
+        System.out.println("Choose a move: "); 
+        int moveIndex = Integer.parseInt(scanner.nextLine()); 
+        queuedMove[index] = activePokemon[index].moves[moveIndex];
+    }
+    
+    void resolveMoves() {
+        int first; 
+        int second; 
+        
+        if (queuedMove[0].priority > queuedMove[1].priority) {
+            first = 0; 
+            second = 1; 
+        } else if (queuedMove[1].priority > queuedMove[0].priority) {
+            first = 1; 
+            second = 0; 
+        } else {
+            if (activePokemon[0].speed > activePokemon[1].speed) {
+                first = 0; 
+                second = 1; 
+            } else if (activePokemon[1].speed > activePokemon[0].speed) {
+                first = 1; 
+                second = 0; 
+            } else if (Utility.roll(50)) {
+                first = 0;
+                second = 1; 
+            } else {
+                first = 1; 
+                second = 0;
             }
+        }
+        
+        int status; 
+        
+        if (queuedMove[first] instanceof SwitchMove) {
+            status = ((SwitchMove) queuedMove[first]).use(activePokemon[first], activePokemon[second], first);
+        } else {
+            status = queuedMove[first].use(activePokemon[first], activePokemon[second]);
+        }
+        
+        if (status != Move.SUCCESS) {
+            System.out.println("The move was not successful. ");
+        }
+        
+        if (queuedMove[second] instanceof SwitchMove) {
+            status = ((SwitchMove) queuedMove[second]).use(activePokemon[second], activePokemon[first], second);
+        } else {
+            status = queuedMove[second].use(activePokemon[second], activePokemon[first]);
+        }
+        
+        if (status != Move.SUCCESS) {
+            System.out.println("The move was not successful. ");
         }
     }
 }
