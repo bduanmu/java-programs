@@ -7,6 +7,10 @@ class Utility {
         }
         return false; 
     }
+    
+    static int rng(int n, int m) {
+        return (int)(Math.random() * (m - n + 1) + n);
+    }
 }
 
 class Type {
@@ -14,14 +18,16 @@ class Type {
     static int FIRE = 1; 
     static int WATER = 2; 
     static int GRASS = 3; 
+    static int NORMAL = 4; 
     static double[][] effectiveness = {
-        {1.0, 1.0, 1.0, 1.0}, 
-        {1.0, 0.5, 0.5, 2.0}, 
-        {1.0, 2.0, 0.5, 0.5}, 
-        {1.0, 0.5, 2.0, 0.5} 
+        {1.0, 1.0, 1.0, 1.0, 1.0}, 
+        {1.0, 0.5, 0.5, 2.0, 1.0}, 
+        {1.0, 2.0, 0.5, 0.5, 1.0}, 
+        {1.0, 0.5, 2.0, 0.5, 1.0}, 
+        {1.0, 1.0, 1.0, 1.0, 1.0} 
     }; 
     
-    static String[] typeString = {"NO TYPE", "FIRE", "WATER", "GRASS"}; 
+    static String[] typeString = {"NO TYPE", "FIRE", "WATER", "GRASS", "NORMAL"}; 
 }
 
 class Move {
@@ -36,6 +42,7 @@ class Move {
     static int NO_EFFECT = 3; 
     static int IM_FAINTED = 4;
     static int TARGET_FAINTED = 5; 
+    static int IS_ASLEEP = 6; 
     
     Move(String name, int type, int maxPP, int priority) {
         this.name = name; 
@@ -52,6 +59,10 @@ class Move {
         
         if (remainingPP == 0) {
             return NO_PP; 
+        }
+        
+        if (user.status == Pokemon.ASLEEP) {
+            return IS_ASLEEP;
         }
         remainingPP--; 
         return SUCCESS; 
@@ -87,10 +98,14 @@ abstract class TargetingMove extends Move {
 
 class AttackingMove extends TargetingMove {
     int power;
+    int statusEffect; 
+    int accuracy; 
     
-    AttackingMove(String name, int type, int maxPP, int priority, int power) {
+    AttackingMove(String name, int type, int maxPP, int priority, int power, int statusEffect, int accuracy) {
         super(name, type, maxPP, priority);
         this.power = power; 
+        this.statusEffect = statusEffect; 
+        this.accuracy = accuracy; 
     }
     
     int use(Pokemon user, Pokemon target) {
@@ -99,16 +114,16 @@ class AttackingMove extends TargetingMove {
             return moveStatus; 
         }
         
+        if (accuracy != -1 && !Utility.roll(accuracy)) {
+            return MISS; 
+        }
+        
+        target.inflictStatus(statusEffect); 
+        
         int movePower = (int) (power * user.attack * Type.effectiveness[type][target.type])/target.defense; 
         target.takeDamage(movePower); 
         
         return SUCCESS; 
-    }
-}
-
-class StatusMove extends TargetingMove {
-    StatusMove(String name, int type, int maxPP, int priority) { 
-        super(name, type, maxPP, priority);
     }
 }
 
@@ -133,10 +148,13 @@ abstract class Pokemon {
     int status; 
     static int NO_STATUS = 0; 
     static int FAINTED = 1; 
+    static int ASLEEP = 2; 
+    static int BURN = 3; 
     String name;
     Move[] moves = new Move[5]; 
+    int sleepCounter = 0; 
     
-    private String[] statusString = {"", "Fainted"}; 
+    private String[] statusString = {"", "Fainted", "Sleep", "Burn"}; 
 
     Pokemon(String name, int maxHealth, int attack, int defense, int speed, int type) {
         this.maxHealth = maxHealth; 
@@ -159,6 +177,29 @@ abstract class Pokemon {
         remainingHealth -= amount; 
     }
     
+    void inflictStatus(int statusEffect) {
+        if (type == Type.FIRE && statusEffect == BURN) {
+            return; 
+        }
+        if ((statusEffect == ASLEEP && status != ASLEEP) || status == NO_STATUS) {
+            status = statusEffect; 
+            if (status == ASLEEP) {
+                sleepCounter = Utility.rng(2, 4);
+            }
+        }
+    }
+    
+    void onTurnEnd() {
+        if (status == ASLEEP) {
+            sleepCounter--; 
+            if (sleepCounter == 0) {
+                status = Pokemon.NO_STATUS; 
+            }
+        } else if (status == BURN) {
+            takeDamage(maxHealth / 8);
+        }
+    }
+    
     public String toString() {
         return name + " (" + statusString[status] + ") " + remainingHealth + "/" + maxHealth; 
     }
@@ -167,22 +208,30 @@ abstract class Pokemon {
 class Charmander extends Pokemon {
     Charmander(String name) {
         super(name, 39, 52, 43, 65, Type.FIRE);
-        moves[1] = new AttackingMove("Ember1", Type.FIRE, 40, 0, 40); 
-        moves[2] = new AttackingMove("Ember2", Type.FIRE, 40, 0, 40); 
-        moves[3] = new AttackingMove("Ember3", Type.FIRE, 40, 0, 40); 
-        moves[4] = new AttackingMove("Ember4", Type.FIRE, 40, 0, 40); 
+        moves[1] = new AttackingMove("Ember 100%", Type.FIRE, 25, 0, 40, Pokemon.NO_STATUS, 100); 
+        moves[2] = new AttackingMove("Ember 50%", Type.FIRE, 25, 0, 40, Pokemon.NO_STATUS, 50); 
+        moves[3] = new AttackingMove("Ember 0%", Type.FIRE, 25, 0, 40, Pokemon.NO_STATUS, 0); 
+        moves[4] = new AttackingMove("Will-O-Wisp", Type.FIRE, 25, 0, 0, Pokemon.BURN, 85); 
     }
 }
 
 class Bulbasaur extends Pokemon {
     Bulbasaur(String name) {
         super(name, 45, 49, 49, 45, Type.GRASS);
+        moves[1] = new AttackingMove("Vine Whip1", Type.GRASS, 25, 0, 45, Pokemon.NO_STATUS, 100);
+        moves[2] = new AttackingMove("Vine Whip2", Type.GRASS, 25, 0, 45, Pokemon.NO_STATUS, 100);
+        moves[3] = new AttackingMove("Vine Whip3", Type.GRASS, 25, 0, 45, Pokemon.NO_STATUS, 100);
+        moves[4] = new AttackingMove("Sleep Powder", Type.GRASS, 15, 0, 0, Pokemon.ASLEEP, 75);
     }
 }
 
 class Squirtle extends Pokemon {
     Squirtle(String name) {
         super(name, 44, 48, 65, 43, Type.WATER);
+        moves[1] = new AttackingMove("Quick Attack1", Type.NORMAL, 30, 1, 40, Pokemon.NO_STATUS, 100); 
+        moves[2] = new AttackingMove("Quick Attack2", Type.NORMAL, 30, 1, 40, Pokemon.NO_STATUS, 100); 
+        moves[3] = new AttackingMove("Quick Attack3", Type.NORMAL, 30, 1, 40, Pokemon.NO_STATUS, 100); 
+        moves[4] = new AttackingMove("Quick Attack 0 Damage", Type.NORMAL, 30, 1, -1, Pokemon.NO_STATUS, 100); 
     }
 }
 
@@ -204,12 +253,12 @@ class Game {
         players[1] = new Player(); 
         players[0].team[0] = new Charmander("Charmander1.0"); 
         players[0].team[1] = new Charmander("Charmander1.1"); 
-        players[0].team[2] = new Charmander("Charmander1.2"); 
-        players[0].team[3] = new Charmander("Charmander1.3"); 
+        players[0].team[2] = new Squirtle("Squirtle1"); 
+        players[0].team[3] = new Bulbasaur("Bulbasaur1"); 
         players[1].team[0] = new Charmander("Charmander2.0"); 
         players[1].team[1] = new Charmander("Charmander2.1"); 
-        players[1].team[2] = new Charmander("Charmander2.2"); 
-        players[1].team[3] = new Charmander("Charmander2.3");
+        players[1].team[2] = new Squirtle("Squirtle2"); 
+        players[1].team[3] = new Bulbasaur("Bulbasaur2");
         numAlivePokemon[0] = 4; 
         numAlivePokemon[1] = 4;
     }
@@ -225,6 +274,8 @@ class Game {
             displayActivePokemon(1); 
             chooseMove(1); 
             resolveMoves();
+            activePokemon[0].onTurnEnd();
+            activePokemon[1].onTurnEnd();
             for (int i = 0; i < 2; i++) {
                 if (activePokemon[i].status == Pokemon.FAINTED) {
                     numAlivePokemon[i]--; 
