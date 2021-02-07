@@ -137,13 +137,13 @@ class Hair extends Trait {
 }
 
 class Gender extends Trait {
-    public static class GenderProperty extends Property {
+    public static class Value extends Property {
         public enum Code {
             MALE, 
             FEMALE; 
         }
         
-        GenderProperty(int gender) {
+        Value(int gender) {
             super(gender);
             for (Code code: Code.values()) {
                 stringValues.add(code.toString()); 
@@ -152,12 +152,38 @@ class Gender extends Trait {
     }
     
     Gender(int gender) {
-        properties.add(new GenderProperty(gender)) ;
+        properties.add(new Value(gender));
+    }
+}
+
+class Shirt extends Trait {
+    public static class Colour extends Property {
+        public enum Code {
+            BLACK, 
+            WHITE,
+            RED,
+            BLUE, 
+            YELLOW, 
+            GREEN, 
+            PINK;
+        }
+        
+        Colour(int colour) {
+            super(colour); 
+            for (Code code: Code.values()) {
+                stringValues.add(code.toString()); 
+            }
+        }
+    }
+    
+    Shirt(int colour) {
+        properties.add(new Colour(colour));
     }
 }
 
 class Person {
     ArrayList<Trait> traits = new ArrayList<Trait>(); 
+    boolean faceUp = true;
     
     /*Person(String name, boolean gender, Hair.Colour.Code hairColour, Hair.Length.Code hairLength, Eye.Colour.Code eyeColour, Eye.Size.Code eyeSize) {
         traits.add(new Name(name)); 
@@ -171,51 +197,144 @@ class Person {
         traits.add(new Gender(Utility.randInt(0, 2))); 
         traits.add(new Hair(Utility.randInt(0, Hair.Colour.Code.values().length), Utility.randInt(0, Hair.Length.Code.values().length))); 
         traits.add(new Eye(Utility.randInt(0, Eye.Colour.Code.values().length), Utility.randInt(0, Eye.Size.Code.values().length)));
+        traits.add(new Shirt(Utility.randInt(0, Shirt.Colour.Code.values().length)));
+    }
+    
+    Person(Person person) {
+        traits = person.traits; 
+        faceUp = person.faceUp; 
+    }
+    
+    public String toString() {
+        String string = ""; 
+        for (Trait t: traits) {
+            string += t.toString() + ": ";
+            if (t instanceof Name) {
+                string += ((Name) t).name; 
+            }
+            for (Property p: t.properties) {
+                string += p.stringValues.get(p.value) + ", ";
+            }
+            string += "\n";
+        }
+        
+        return string;
     }
 }
 
 class Game {
     Scanner scanner = new Scanner(System.in); 
     ArrayList<ArrayList<Person>> players = new ArrayList<ArrayList<Person>>(2);
+    int[] numFaceUp = new int[2]; 
+    Person[] chosenPerson = new Person[2]; 
+    private final int CORRECT = 0; 
+    private final int INCORRECT = 1; 
+    private final int WIN = 2; 
     
     Game() {
         players.add(new ArrayList<Person>(25)); 
         players.add(new ArrayList<Person>(25)); 
         
         for (int i = 0; i < 25; i++) {
-            // create then copy the person, add to both players' board
-            players.get(0).add("Person " + i);
+            players.get(0).add(new Person("" + i));
+            players.get(1).add(new Person(players.get(0).get(i)));
         }
+        
+        chosenPerson[0] = players.get(0).get(Utility.randInt(0, 25)); 
+        chosenPerson[1] = players.get(1).get(Utility.randInt(0, 25)); 
+        numFaceUp[0] = 25; 
+        numFaceUp[1] = 25; 
     }
     
-    void ask() {
+    int ask(int turn) {
+        int opponent = (turn + 1) % 2; 
+        
         System.out.println("Ask about: ");
         int i = 0; 
-        for (Trait t: person.traits) {
+        for (Trait t: chosenPerson[opponent].traits) {
             System.out.println(i + ": " + t);
             i++; 
         }
         i = 0; 
-        int input = Integer.parseInt(scanner.nextLine());
-        Trait trait = person.traits.get(input);
+        int traitIndex = Integer.parseInt(scanner.nextLine());
+        Trait trait = chosenPerson[opponent].traits.get(traitIndex);
+        if (trait instanceof Name) {
+            System.out.println("What is your guess?");
+            String nameGuess = scanner.nextLine();
+            if (((Name) trait).name.equals(nameGuess)) {
+                return WIN; 
+            }
+            for (Person person: players.get(turn)) {
+                if (((Name) person.traits.get(0)).name.equals(nameGuess)) {
+                    if (person.faceUp) {
+                        person.faceUp = false;
+                        numFaceUp[turn]--;
+                    }
+                    return INCORRECT; 
+                }
+            }
+            
+            return INCORRECT;
+        }
         System.out.println("Ask about the " + trait + "'s:");
         for (Property p: trait.properties) {
             System.out.println(i + ": " + p); 
             i++;
         }
         i = 0; 
-        input = Integer.parseInt(scanner.nextLine());
-        System.out.println("Is the " + trait.properties.get(input) + ": ");
-        for (String s: trait.properties.get(input).stringValues) { 
+        int propertyIndex = Integer.parseInt(scanner.nextLine());
+        System.out.println("Is the " + trait.properties.get(propertyIndex) + ": ");
+        for (String s: trait.properties.get(propertyIndex).stringValues) { 
             System.out.println(i + ": " + s); 
             i++;
         }
         i = 0;
-        input = Integer.parseInt(scanner.nextLine());
+        int propertyValue = Integer.parseInt(scanner.nextLine()); 
+        
+        if (chosenPerson[opponent].traits.get(traitIndex).properties.get(propertyIndex).value == propertyValue) {
+            for (Person person: players.get(turn)) {
+                if (person.traits.get(traitIndex).properties.get(propertyIndex).value != propertyValue) {
+                    if (person.faceUp) {
+                        person.faceUp = false; 
+                        numFaceUp[turn]--;
+                    }
+                }
+            }
+            return CORRECT;
+        } else {
+            for (Person person: players.get(turn)) {
+                if (person.traits.get(traitIndex).properties.get(propertyIndex).value == propertyValue) {
+                    if (person.faceUp) {
+                        person.faceUp = false; 
+                        numFaceUp[turn]--;
+                    }
+                }
+            }
+            return INCORRECT; 
+        }
     }
     
     void start() {
-        ask();
+        int turn = 0;
+        while (true) {
+            printPeople(turn); 
+            System.out.println("It is Player " + turn + "'s turn. ");
+            System.out.println(numFaceUp[turn] + " people remain. ");
+            int result = ask(turn); 
+            if (result == WIN || numFaceUp[turn] == 1) {
+                System.out.println("Player " + turn + " wins! ");
+                return;
+            }
+            turn = (turn + 1) % 2;
+        }
+    }
+    
+    void printPeople(int index) {
+        for (Person p: players.get(index)) {
+            if (p.faceUp) {
+                System.out.println(p); 
+            }
+        }
     }
 }
 
